@@ -75,6 +75,7 @@ class FakeArm(threading.Thread):
             self.state.send_json({"Q": self.q.tolist(), "Qd": ((self.q-before)/dt).tolist(),
                                   "timestamp_ms": time.time()*1000,
                                   "joint_target_watchdog_s": self.watchdog_s,
+                                  "robot_state_age_s": 0., "rtde_connected": True,
                                   "protective_stopped": False, "emergency_stopped": False})
             time.sleep(dt)
 

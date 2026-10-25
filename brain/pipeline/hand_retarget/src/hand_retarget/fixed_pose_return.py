@@ -18,6 +18,15 @@ def fixed_waypoints(start_q, start_h, goal_q, goal_h):
     return q, h, times
 
 
+def require_stopped_state(arm):
+    flags=('protective_stopped', 'emergency_stopped', 'is_truncated')
+    velocity=np.asarray(arm.get('Qd'), dtype=float)
+    if (any(type(arm.get(k)) is not bool for k in flags) or any(arm[k] for k in flags)
+            or velocity.shape != (6,) or not np.isfinite(velocity).all()
+            or np.max(np.abs(velocity)) > .01):
+        raise ValueError('Return preparation requires an unfaulted stationary arm.')
+
+
 def prepare(state_path, reference, calibration_rollout, output):
     state = json.loads(state_path.read_text())
     record = json.loads((reference / 'report.json').read_text())
@@ -25,9 +34,7 @@ def prepare(state_path, reference, calibration_rollout, output):
     if not record.get('completed') or not record.get('stop_confirmed'):
         raise ValueError('Reference must be a successfully completed measured levelled pose.')
     arm, hand = state['arm'], state['hand']
-    if (any(arm.get(k) for k in ('protective_stopped', 'emergency_stopped', 'is_truncated'))
-            or np.max(np.abs(arm['Qd'])) > .01):
-        raise ValueError('Return preparation requires an unfaulted stationary arm.')
+    require_stopped_state(arm)
     with np.load(reference / 'execution.npz', allow_pickle=False) as data:
         goal_q = data['samples'][-1, 1:7].copy()
     with np.load(reference / 'plan.npz', allow_pickle=False) as data:

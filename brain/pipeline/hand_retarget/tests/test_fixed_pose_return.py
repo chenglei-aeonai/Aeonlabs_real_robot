@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from hand_retarget.fixed_pose_return import fixed_waypoints
+from hand_retarget.fixed_pose_return import fixed_waypoints, require_stopped_state
 from hand_retarget import robot_rollout as rollout
 
 
@@ -23,3 +23,14 @@ def test_fixed_return_keeps_goal_when_start_changes():
 def test_fixed_return_rejects_unreachable_joint_range():
     with pytest.raises(ValueError, match='joint limits'):
         fixed_waypoints(np.zeros(6), np.zeros(20), np.full(6, 20.), np.zeros(20))
+
+
+@pytest.mark.parametrize('bad', [None, [], [0.]*5, [float('nan')]*6, [float('inf')]*6, [.02]*6])
+def test_fixed_return_requires_finite_stationary_velocity(bad):
+    with pytest.raises(ValueError, match='stationary'):
+        require_stopped_state(dict(Qd=bad, protective_stopped=False, emergency_stopped=False, is_truncated=False))
+
+
+def test_fixed_return_requires_explicit_fault_status():
+    with pytest.raises(ValueError, match='stationary'):
+        require_stopped_state({'Qd':[0.]*6})

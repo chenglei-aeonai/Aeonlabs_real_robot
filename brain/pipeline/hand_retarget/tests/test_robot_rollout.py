@@ -89,7 +89,7 @@ def test_replay_only_mock_endpoints_requires_confirmation_and_watchdog(source,tm
         def recv(self,**kw):
             if self.once:raise zmq.Again()
             self.once=True
-            return {'timestamp_ms':time.time()*1000,'Q':live_q.tolist(),'Qd':[0.]*6,'joint_target_watchdog_s':watchdog}
+            return {'timestamp_ms':time.time()*1000,'Q':live_q.tolist(),'Qd':[0.]*6,'joint_target_watchdog_s':watchdog,'robot_state_age_s':0.,'rtde_connected':True,'is_truncated':False,'protective_stopped':False,'emergency_stopped':False}
         def wait(self):return self.fresh()
         def fresh(self):self.poll();return self.q.copy()
         def stop(self):sent.append(('stop',None))
@@ -162,7 +162,7 @@ def test_velocity_stop_preserves_unsent_candidate_and_last_command(source,tmp_pa
         def recv(self,**kwargs):
             if self.once:raise zmq.Again()
             self.once=True
-            return {'timestamp_ms':time.time()*1000,'Q':q.tolist(),'Qd':[0.]*6,'joint_target_watchdog_s':.2}
+            return {'timestamp_ms':time.time()*1000,'Q':q.tolist(),'Qd':[0.]*6,'joint_target_watchdog_s':.2,'robot_state_age_s':0.,'rtde_connected':True,'is_truncated':False,'protective_stopped':False,'emergency_stopped':False}
         def wait(self):return self.fresh()
         def fresh(self):self.poll();return self.q.copy()
         def stop(self):sends.append(('stop',None))

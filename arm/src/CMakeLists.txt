@@ -42,6 +42,7 @@ add_executable(state_publisher state_publisher.cpp)
 
 # Create a test executable
 add_executable(spline_test spline_test.cpp)
+add_executable(feedback_clock_test feedback_clock_test.cpp)
 
 
 # Include directories

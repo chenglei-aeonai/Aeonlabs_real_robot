@@ -16,9 +16,11 @@ Run from this repository root. The pipeline uses the bundled sibling components:
   acceleration and tracking-gain configuration;
 - the normal arm controller accepting streamed `target_q` and `stop` messages,
   reporting actual `Q`, actual `Qd`, producer `timestamp_ms`, stop/fault flags and
-  `joint_target_watchdog_s` in `(0, 0.25]`;
+  `joint_target_watchdog_s` in `(0, 0.25]`, `rtde_connected`, and
+  `robot_state_age_s` derived from advances in the RTDE source timestamp;
 - the hand bridge reporting actual positions/velocities and `measured_age_s`.
   Publishing a packet must not reset the age of an old sensor measurement.
+  A missing velocity array is rejected rather than represented as zero speed.
 
 **Build the controller and run the updated bridge from this branch.** The
 required source changes and collision model are included in this repository.

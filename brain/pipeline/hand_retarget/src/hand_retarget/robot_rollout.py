@@ -492,8 +492,13 @@ def replay(folder,send=False,web_session=False,arm_only=False,speed=1.):
                 except zmq.Again:return
                 self.diagnostic_state=state
                 age=time.time()-state.get('timestamp_ms',0)/1000
-                if not -.05<=age<=.25 or any(state.get(k) for k in ('is_truncated','protective_stopped','emergency_stopped')):
+                flags=('is_truncated','protective_stopped','emergency_stopped')
+                if (not -.05<=age<=.25 or any(type(state.get(k)) is not bool for k in flags)
+                        or any(state[k] for k in flags)):
                     raise RuntimeError('Stale or faulted arm state.')
+                if (state.get('rtde_connected') is not True
+                        or not 0<=state.get('robot_state_age_s',float('inf'))<=.25):
+                    raise RuntimeError('Missing or stale RTDE sample age; rebuild and restart the arm controller.')
                 if not 0<state.get('joint_target_watchdog_s',0)<=.25:
                     raise RuntimeError('Controller must advertise a joint-target watchdog <= 0.25 s. Rebuild and restart the normal arm controller.')
                 if isinstance(state.get('calibration_guard'),dict):raise RuntimeError('Stop calibration and use the normal arm controller.')

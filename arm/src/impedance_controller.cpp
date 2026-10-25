@@ -10,6 +10,7 @@
 
 #include "pose.hpp"
 #include "calibration_guard.hpp"
+#include "feedback_clock.hpp"
 #include "spline.hpp"
 #include "ur_rtde/dashboard_client.h"
 #include "ur_rtde/rtde_control_interface.h"
@@ -143,14 +144,11 @@ class UR5Controller {
     }
 
     void update_robot_state() {
-        if (calibration_guard.enabled) {
-            const double stamp = receive.getTimestamp();
-            if (!std::isfinite(stamp) || stamp < last_rtde_timestamp)
-                calibration_guard.trip("Robot RTDE timestamp invalid/reset; restart required");
-            if (stamp > last_rtde_timestamp) {
-                last_rtde_timestamp = stamp;
-                last_rtde_update = CalibrationGuard::Clock::now();
-            }
+        rtde_clock.observe(receive.getTimestamp());
+        if (!rtde_clock.healthy(receive.isConnected())) {
+            rtde_feedback_failed = true;
+            if (calibration_guard.enabled)
+                calibration_guard.trip("Robot RTDE feedback stalled/reset/disconnected; restart required");
         }
         current_pose = receive.getActualTCPPose();
         curr_vel = utils::std_to_eigen(receive.getActualTCPSpeed());
@@ -336,7 +334,9 @@ class UR5Controller {
             {"Q", utils::eigen_to_std(curr_Q)},
             {"Qd", utils::eigen_to_std(curr_Qd)},
             {"force", utils::eigen_to_std(curr_force_lowpass)},
-            {"is_truncated", !success},
+            {"is_truncated", !success || rtde_feedback_failed},
+            {"robot_state_age_s", rtde_clock.age()},
+            {"rtde_connected", receive.isConnected()},
             {"protective_stopped", receive.isProtectiveStopped()},
             {"emergency_stopped", receive.isEmergencyStopped()},
             {"calibration_guard", calibration_guard.status()},
@@ -420,9 +420,14 @@ class UR5Controller {
 
             control.kickWatchdog();
             send_state();
+            if (rtde_feedback_failed) {
+                stop_motion("Robot RTDE feedback stalled/reset/disconnected; restart required");
+                send_state();
+                return;
+            }
             if (calibration_guard.enabled && calibration_guard.fault.empty()) {
                 try {
-                    CalibrationGuard::require(receive.isConnected() && std::chrono::duration<double>(CalibrationGuard::Clock::now()-last_rtde_update).count() <= calibration_guard.value("state_timeout_s"),
+                    CalibrationGuard::require(receive.isConnected() && rtde_clock.age() <= calibration_guard.value("state_timeout_s"),
                         "Robot RTDE feedback stalled/disconnected");
                     calibration_guard.tick(current_pose.to_std_vector(), utils::eigen_to_std(curr_Q),
                         utils::eigen_to_std(curr_vel), utils::eigen_to_std(curr_Qd), CalibrationGuard::Clock::now());
@@ -582,8 +587,8 @@ class UR5Controller {
     zmq::socket_t publisher;
     
     CalibrationGuard calibration_guard;
-    double last_rtde_timestamp = -1;
-    CalibrationGuard::Clock::time_point last_rtde_update = CalibrationGuard::Clock::now();
+    FeedbackClock rtde_clock;
+    bool rtde_feedback_failed = false;
     Eigen::Matrix<double,6,1> guard_previous_velocity = Eigen::Matrix<double,6,1>::Zero();
     ur_rtde::RTDEControlInterface control;
     ur_rtde::RTDEReceiveInterface receive;

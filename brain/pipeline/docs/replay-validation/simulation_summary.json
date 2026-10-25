@@ -1,0 +1,50 @@
+{
+  "report": "Tracking error (deg): arm max 4.5, rms 1.10; hand max 6.0, rms 1.12\n  worst joints: rj_dg_5_3 6.0, rj_dg_4_2 5.4, rj_dg_3_3 5.3, rj_dg_4_3 4.9, rj_dg_1_4 4.9\nDrives at their effort limit: none\nContacts hand-table: none\nContacts arm-table: none\nContacts arm-object: none\nContacts finger-finger:\n  rl_dg_4_3 / rl_dg_5_4: 90/266 steps, deepest 0.1 mm, largest force 2.9 N\nContacts hand-self: none\nHand-object contacts: none",
+  "frames": 266,
+  "source_duration_s": 4.416666666666667,
+  "contacts": {
+    "finger-finger": {
+      "rl_dg_4_3 / rl_dg_5_4": [
+        90,
+        0.00013897892695419165,
+        2.918214549878377
+      ]
+    }
+  },
+  "object_maximum_lift_m": 6.9530049932892e-10,
+  "object_final_displacement_m": 6.968300595287044e-07,
+  "geometric_check": {
+    "cube_center_robot_base_m": [
+      -0.13080227409445083,
+      0.8621198442972184,
+      -0.007435245011590284
+    ],
+    "closest_fingertip_surface_distance_m": 0.2320264674936457,
+    "frame": 61,
+    "finger": "rl_dg_3_tip",
+    "source_fps": 24.0,
+    "mano_fingertip_minimum_table_height_m": 0.25168179059989365,
+    "robot_fingertip_minimum_table_height_m": 0.25064201491880383,
+    "mano_wrist_first_last_height_m": [
+      0.32347617873864093,
+      0.42552613990690774
+    ]
+  },
+  "object_parameters": {
+    "pixel": [
+      394.7986051972803,
+      186.92415490597796
+    ],
+    "edge_m": 0.06680558176556228,
+    "mass_kg": 0.05,
+    "yaw_deg": 2.4067400861493,
+    "friction": 0.8
+  },
+  "object_parameters_measured": false,
+  "source_sha256": {
+    "robot_demonstration.npz": "df5bd7727650fbb230598a3662b891950a6aeb402e14ee06810970ba7e00d764",
+    "capture.json": "66f7097f5a2c351bcb689f20445f2f34140c3e2933969db73763ca6008f8e335",
+    "estimated_cube.json": "ea2470b1e05005f78865d8980abc33c85f789b57af6dcacd79d84489769481ff"
+  },
+  "simulator_sha256": "f7b004d009ed079e6251a4a6e29eb47596bff5723c7a7343948a37a75a96b1a8"
+}

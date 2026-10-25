@@ -87,3 +87,8 @@ inspection and recovery; reconnect does not automatically unlock them.
 The sources also include the existing optional calibration guard and its
 standalone test target. Building requires `libssl-dev` for SHA-256 validation of
 collision geometry. No installation-specific safety configuration is included.
+
+The replay protocol also reports `rtde_connected` and `robot_state_age_s`. Sample
+age advances only when the robot's RTDE timestamp advances. A stalled, reset or
+disconnected RTDE stream stops either controller mode and requires a restart.
+Rebuild before using clients that require these fields.
