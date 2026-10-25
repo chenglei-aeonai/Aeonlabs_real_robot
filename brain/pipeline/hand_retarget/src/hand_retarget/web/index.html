@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Robot Demonstration Studio · Aeon Labs</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/style.css?v=replay-1">
+  <script>window.addEventListener('error',event=>{const box=document.getElementById('server-error');if(box&&event.message){box.hidden=false;box.textContent='Page error: '+event.message+'. Reload the page to load the latest interface.';}});</script>
+  <script src="/i18n.js?v=replay-1" defer></script>
+  <script src="/app.js?v=replay-1" defer></script>
+<script src="/retarget.js?v=3" defer></script>
+<script src="/simulation.js?v=1" defer></script>
+<script src="/rollout.js?v=replay-1" defer></script>
+</head>
+<body>
+  <p id="calibration-status" role="status" style="padding:12px 24px;margin:0;background:#fff3cd;color:#423500">Checking latest calibration…</p>
+<aside class="rail"><a class="brand" href="/" aria-label="Aeon Labs"><img src="/aeonlabs-wordmark.png" alt="Aeon Labs"></a><div class="rail-label" data-i18n="robotics">ROBOTICS</div><div class="nav-active"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 12 12"><path d="M3 1.8v8.4L10 6z" fill="currentColor"/></svg></span><span data-i18n="demonstrations">Demo</span></div><div class="rail-foot">UR5e<br><span data-i18n="rightHand">Tesollo DG5F · Right</span></div></aside>
+<main>
+  <header><img class="wordmark" src="/aeonlabs-wordmark.png" alt="Aeon Labs"><div class="header-actions"><button id="language-toggle" class="pill language-toggle" type="button" aria-label="Switch to Chinese">中文</button><button id="health" class="pill" type="button" aria-haspopup="dialog" aria-controls="server-dialog" title="Server startup, checkpoint selection and boot log">● Checking CSCS</button></div></header>
+  <div id="health-detail" class="notice" hidden></div>
+  <div class="hero"><div><div class="eyebrow" data-i18n="studio">ROBOT DEMONSTRATION STUDIO</div><h1 data-i18n="headline">From observation to action.</h1><p data-i18n="intro">Upload a robot-view image, describe the task, and export a dexterous-hand trajectory.</p></div><div class="recipe"><div data-i18n="durationBadge">4-second demonstration</div><span data-i18n="jointsBadge">60 Hz · 6 + 20 joints</span></div></div>
+  <div class="workspace">
+    <section class="panel">
+      <div class="section-title"><span class="number">01</span><h2 data-i18n="inputTitle">Initial observation &amp; task</h2></div>
+      <form id="generate-form">
+        <div id="dropzone" class="dropzone">
+          <div id="upload-prompt"><div class="upload-icon">↥</div><strong data-i18n="dropImage">Drop a first-person robot-hand image</strong><p data-i18n="formats">PNG, JPEG or WebP · up to 16 MP</p></div>
+          <canvas id="input-preview" aria-label="Input image; paint the hand region in manual mode" data-i18n-aria-label="inputCanvas" hidden></canvas>
+          <input id="image-file" type="file" accept="image/png,image/jpeg,image/webp" hidden>
+        </div>
+        <div class="button-row"><button id="capture-robot" type="button" class="primary" data-i18n="captureRobot">Capture robot camera</button><button id="choose-image" type="button" data-i18n="upload">Upload image</button><button id="open-camera" type="button" data-i18n="camera">Use camera</button><span id="image-size" class="muted"></span></div>
+        <p class="hint" data-i18n="captureRobotHint">Keep the arm and fingers stationary. Capture uses the robot PC's RealSense and measured joints; no motion is commanded.</p>
+        <section id="capture-result" hidden aria-live="polite">
+          <div id="crop-controls">
+            <h3 data-i18n="cropTitle">Frame the hand and table</h3>
+            <canvas id="crop-preview" aria-label="Live crop preview"></canvas>
+            <div class="row"><div><label for="crop-width" data-i18n="cropWidth">Output width</label><input id="crop-width" type="number" min="32" max="4096" step="1" value="832"></div><div><label for="crop-height" data-i18n="cropHeight">Output height</label><input id="crop-height" type="number" min="32" max="4096" step="1" value="640"></div></div>
+            <label for="crop-zoom" data-i18n="cropZoom">Crop zoom</label><input id="crop-zoom" type="range" min="1" max="4" step="0.05" value="1">
+            <label for="crop-x" data-i18n="cropX">Horizontal position</label><input id="crop-x" type="range" min="0" max="100" step="0.5" value="50">
+            <label for="crop-y" data-i18n="cropY">Vertical position</label><input id="crop-y" type="range" min="0" max="100" step="0.5" value="50">
+            <p id="crop-description" class="hint"></p>
+            <div class="button-row"><button id="apply-crop" type="button" data-i18n="applyCrop">Apply crop</button><button id="reset-crop" type="button" data-i18n="resetCrop">Reset hand/table framing</button></div>
+            <p class="hint" data-i18n="cropHint">Apply saves width, height, zoom, and position as defaults for future captures in this browser. Intrinsics and projections follow the crop; 3D GT stays unchanged.</p>
+          </div>
+          <p id="capture-summary" class="hint"></p>
+          <div class="previews"><figure><img id="capture-robot-overlay" alt="Robot joint overlay"><figcaption data-i18n="robotOverlay">Robot joints</figcaption></figure><figure><img id="capture-mano-overlay" alt="Mapped MANO overlay"><figcaption data-i18n="manoOverlay">Mapped MANO joints</figcaption></figure></div>
+          <div class="downloads"><a id="capture-json" data-i18n="captureJSON">Camera intrinsics + MANO JSON</a><a id="capture-image" data-i18n="captureImage">Undistorted image</a></div>
+          <button id="convert-hand" type="button" class="primary full" data-i18n="convertHand">Convert robot hand and arm to human</button>
+        </section>
+        <div id="camera-area" hidden><video id="camera" autoplay playsinline muted></video><div class="button-row"><button id="capture" type="button" data-i18n="capture">Capture frame</button><button id="close-camera" type="button" data-i18n="closeCamera">Close camera</button></div></div>
+        <label for="instruction" data-i18n="instruction">Task instruction</label>
+        <textarea id="instruction" rows="3" placeholder="Example: Grasp the cup with the right hand and slowly lift it." data-i18n-placeholder="instructionPlaceholder" required maxlength="4000"></textarea>
+        <p class="hint" data-i18n="calibratedCameraHint">Camera intrinsics come from the applied capture/crop. Camera orientation comes from the saved calibration.</p>
+        <details><summary data-i18n="advanced">Edit region &amp; calibration</summary>
+          <label class="check"><input id="manual-mask" type="checkbox"><span data-i18n="manualMask">Specify the edit region manually (automatic by default)</span></label>
+          <div id="mask-tools" hidden><p class="hint" data-i18n="maskHint">Paint the robot hand, wrist hardware, and visible arm plus the intended human outline, avoiding objects. White areas allow edits.</p><div class="button-row"><label for="brush" data-i18n="brush">Brush</label><input id="brush" type="range" min="4" max="100" value="30"><button id="clear-mask" type="button" data-i18n="clear">Clear</button></div><label for="mask-file" data-i18n="uploadMask">Or upload a black-and-white mask</label><input id="mask-file" type="file" accept="image/png" hidden><div class="file-picker"><button type="button" data-file-button="mask-file" data-i18n="chooseFile">Choose file</button><span class="muted" data-file-name="mask-file">No file selected</span></div></div>
+          <label for="edited-file" data-i18n="editedFile">Existing human-hand edit (optional; skips image editing)</label><input id="edited-file" type="file" accept="image/png,image/jpeg,image/webp" hidden><div class="file-picker"><button type="button" data-file-button="edited-file" data-i18n="chooseFile">Choose file</button><span class="muted" data-file-name="edited-file">No file selected</span></div>
+          <label for="camera-transform" data-i18n="cameraTransform">Camera → demonstration transform (optional JSON override)</label><input id="camera-transform" type="file" accept=".json,application/json" hidden><div class="file-picker"><button type="button" data-file-button="camera-transform" data-i18n="chooseFile">Choose file</button><span class="muted" data-file-name="camera-transform">No file selected</span></div>
+          <label for="placement" data-i18n="placement">Demonstration → robot-world calibration (optional 4×4 JSON)</label><input id="placement" type="file" accept=".json,application/json" hidden><div class="file-picker"><button type="button" data-file-button="placement" data-i18n="chooseFile">Choose file</button><span class="muted" data-file-name="placement">No file selected</span></div>
+          <p class="hint" data-i18n="placementHint">Without robot calibration, the trajectory aligns to the repository&#x27;s initial hand pose for an experimental replay.</p>
+          <label for="seed" data-i18n="seed">Random seed</label><input id="seed" type="number" min="0" max="2147483647" value="0">
+        </details>
+        <div id="form-error" class="error" role="alert" hidden></div>
+        <button id="generate" class="primary full" type="submit"><span data-i18n="generate">Generate 4-second trajectory</span><span class="arrow" aria-hidden="true">→</span></button>
+        <p class="hint" data-i18n="automaticHint">Headless Codex edits the hands; video/action generation and retargeting run automatically.</p>
+      </form>
+    </section>
+    <section class="panel output">
+      <div class="section-title"><span class="number">02</span><h2 data-i18n="results">Generated results</h2><span id="job-status" class="status" data-i18n="waiting">Waiting for input</span></div>
+      <ol id="steps" class="steps"><li data-stage="mask" data-i18n="maskStage">Locate hands</li><li data-stage="edit" data-i18n="editStage">Edit hands</li><li data-stage="uplift" data-i18n="upliftStage">Estimate pose</li><li data-stage="generate" data-i18n="generateStage">Generate demo</li><li data-stage="retarget" data-i18n="retargetStage">Retarget</li></ol>
+      <div id="empty-state" class="empty-state"><div class="trajectory-icon" aria-hidden="true"><svg width="100" height="70" viewBox="0 0 100 70" fill="none" stroke="#ddd3b4" stroke-width="2"><path d="M8 56H92M12 58V10"/><path d="M12 48C28 48 25 20 42 20S59 46 74 35L90 18"/><circle cx="42" cy="20" r="4" fill="#f9f7f5"/><circle cx="74" cy="35" r="4" fill="#f9f7f5"/></svg></div><h3 data-i18n="emptyTitle">Every motion starts with one frame.</h3><p data-i18n="emptyHint">The edited hands, generated video and robot joint trajectories will appear here.</p></div>
+      <div id="result" hidden>
+        <p id="import-notice" class="notice" hidden data-i18n="importNotice">Saved regression result: hand editing and H3 video generation were not rerun.</p>
+        <p id="job-instruction" class="job-prompt"></p>
+        <p id="job-review" class="notice" hidden></p>
+        <div class="previews"><figure><img id="source-image" alt="Original robot view" data-i18n-alt="sourceAlt"><figcaption data-i18n="sourceCaption">Robot initial observation</figcaption></figure><figure><img id="edited-image" alt="Edited human-hand view" data-i18n-alt="editedAlt" hidden><div id="edit-pending" class="placeholder" data-i18n="editPending">Waiting for hand edit</div><figcaption data-i18n="editedCaption">Human-hand initial condition</figcaption></figure></div>
+        <details id="mask-result" hidden><summary data-i18n="viewMask">View actual edit region</summary><img id="mask-image" alt="White indicates the allowed edit region" data-i18n-alt="maskAlt"></details>
+        <figure id="converted-pose" hidden><img id="converted-mano-overlay" alt="Captured MANO ground-truth pose projected on the converted image"><figcaption data-i18n="convertedPose">Captured GT MANO pose on converted image</figcaption></figure>
+        <video id="output-video" controls playsinline hidden></video>
+        <figure id="predicted-hand-result" hidden><video id="predicted-hand-video" controls playsinline></video><figcaption data-i18n="predictedHandVideo">Generated video with predicted hand skeleton</figcaption></figure>
+        <div id="job-error" class="error" role="alert" hidden></div>
+        <div id="metrics" class="metrics"></div>
+        <div id="trajectory" hidden><div class="chart-header"><h3 data-i18n="jointTrajectory">Joint trajectories</h3><select id="joint-group" aria-label="Select a joint group" data-i18n-aria-label="jointGroup"><option value="arm" data-i18n="armOption">UR5e · 6 joints</option><option value="hand" data-i18n="handOption">DG5F · 20 joints</option></select></div><canvas id="chart" width="800" height="220" aria-label="Joint angle over time" data-i18n-aria-label="chartAlt"></canvas><p class="hint" data-i18n="chartHint">Horizontal: seconds · Vertical: radians</p></div>
+        <div id="downloads" class="downloads"></div>
+        <p id="execution-note" class="hint" hidden data-i18n="executionNote">Exported trajectory; not executed on hardware. The repository&#x27;s real_robot/replay_real.py reads the NPZ. JSON includes the existing controllers&#x27; arm paths and hand targets.</p>
+      </div>
+    </section>
+  </div>
+  <dialog id="server-dialog" aria-labelledby="server-dialog-title">
+  <section class="panel diffusion-panel" id="inference-server-panel">
+    <div class="section-title"><h2 id="server-dialog-title" data-i18n="serverPanelTitle">Server startup & checkpoint</h2><span id="diffusion-state" class="status">Not connected</span><button id="close-server-dialog" type="button" aria-label="Close server controls">✕</button></div>
+    <div id="server-status-banner" class="server-status-banner" role="status" aria-live="polite">Checking connection to CSCS…</div>
+    <ol id="server-boot-steps" class="steps" aria-label="GPU startup progress"><li>CSCS connection</li><li>GPU allocation</li><li>Loading checkpoint</li><li>Ready</li></ol>
+    <p class="hint"><span id="server-last-check">Waiting for first status response.</span> · <a href="/api/diffusion/status" target="_blank" rel="noopener">View connection diagnostics</a></p>
+    <div class="row"><div><label for="aeon-url" data-i18n="aeonURL">aeon-webui URL / SSH tunnel</label><input id="aeon-url" type="url" placeholder="http://127.0.0.1:8017"><div class="button-row"><button id="connect-diffusion" type="button" data-i18n="connectDiffusion">Connect / refresh</button></div></div>
+      <div><label for="checkpoint-profile" data-i18n="checkpointProfile">Checkpoint profile</label><select id="checkpoint-profile"></select><p id="checkpoint-recipe" class="hint"></p><div class="row"><div><label for="checkpoint-queue" data-i18n="checkpointQueue">GPU queue</label><select id="checkpoint-queue"><option value="normal">Normal · 2 h limit</option><option value="debug">Debug · 30 min limit</option></select></div><div><label class="check"><input id="checkpoint-sol" type="checkbox" checked><span>NVIDIA Sol</span></label></div></div><div class="button-row"><button id="load-checkpoint" type="button" data-i18n="loadCheckpoint" disabled>Start server / load checkpoint</button><button id="stop-checkpoint" type="button" data-i18n="stopCheckpoint" disabled>Stop server</button></div></div></div>
+    <p id="diffusion-detail" class="hint" aria-live="polite"></p>
+    <div id="server-error" class="error" hidden role="alert"></div>
+    <p id="server-runtime-detail" class="hint"></p>
+    <section id="server-boot-log-section"><h3>GPU server boot log</h3><pre id="server-boot-log" class="server-boot-log" aria-live="polite">No GPU allocation yet.</pre></section>
+    <details><summary>Connection and startup activity</summary><pre id="server-activity" class="server-activity">Waiting for connection check…</pre></details>
+    <div class="server-facts" aria-live="polite"><div><small data-i18n="activeCheckpoint">Active checkpoint</small><span id="server-active-profile">—</span></div><div><small data-i18n="serverJob">GPU job</small><span id="server-job">—</span></div><div><small data-i18n="serverNode">Node</small><span id="server-node">—</span></div><div><small data-i18n="checkpointQueue">GPU queue</small><span id="server-queue">—</span></div></div>
+  </section>
+  </dialog>
+  <section class="panel diffusion-panel">
+    <div class="section-title"><span class="number">04</span><h2 data-i18n="diffusionTitle">Future video + hand 3D</h2></div>
+    <label for="diffusion-source" data-i18n="diffusionSource">Converted conditioning frame</label><select id="diffusion-source"></select>
+    <div id="diffusion-source-preview" class="previews" hidden><figure><img id="diffusion-input-image" alt="Converted RGB conditioning frame"><figcaption data-i18n="convertedRGB">Converted RGB</figcaption></figure><figure><img id="diffusion-input-gt" alt="Captured GT on converted frame"><figcaption data-i18n="capturedConditioning">Captured MANO GT + crop intrinsics</figcaption></figure></div>
+    <p id="diffusion-source-note" class="hint"></p>
+    <div class="button-row"><button id="prepare-conditioning" type="button" data-i18n="prepareConditioning">Export GT conditioning bundle</button><a id="conditioning-download" hidden data-i18n="downloadConditioning">Download conditioning NPZ</a></div>
+    <label for="future-instruction" data-i18n="futureInstruction">What should the hand do next?</label><textarea id="future-instruction" rows="2" maxlength="4000" placeholder="Reach for the pink block and lift it."></textarea>
+    <label class="check"><input id="zero-contact" type="checkbox"><span data-i18n="zeroContact">For contact-conditioned checkpoints: assume no initial contact or force</span></label>
+    <p class="hint" data-i18n="diffusionHint">The model receives the converted image, measured intrinsics, and captured camera-space GT. It does not re-estimate the initial pose. Loading a checkpoint starts a GPU job on the connected inference service.</p>
+    <div id="diffusion-error" class="error" hidden role="alert"></div>
+    <button id="generate-future" type="button" class="primary full" data-i18n="generateFuture" disabled>Generate future video + hand 3D</button>
+    <div id="future-results" hidden>
+      <label for="future-result-job" data-i18n="futureResult">Generated results</label><select id="future-result-job"></select>
+      <p id="future-result-status" class="hint" role="status"></p>
+      <div id="future-progress" hidden aria-live="polite">
+        <p id="future-progress-stage"></p>
+        <progress id="future-progress-bar" max="100" aria-label="Generation sampling progress"></progress>
+        <p id="future-progress-timing" class="hint"></p>
+      </div>
+      <div class="previews">
+        <figure id="future-rgb-figure" hidden><video id="future-rgb-video" controls playsinline preload="metadata"></video><figcaption data-i18n="futureRGBVideo">Generated video</figcaption></figure>
+        <figure id="future-overlay-figure" hidden><video id="future-overlay-video" controls playsinline preload="metadata"></video><figcaption data-i18n="predictedHandVideo">Generated video with predicted hand skeleton</figcaption></figure>
+      </div>
+      <a id="future-hands-download" hidden data-i18n="downloadFutureHands">Future hand 3D NPZ</a>
+    </div>
+  </section>
+  <section class="panel" id="retarget-panel">
+    <div class="section-title"><span class="number">05</span><h2>Retarget to robot hand</h2></div>
+    <label for="retarget-source">Generated hand trajectory</label><select id="retarget-source"></select>
+    <p class="hint">Uses the calibration saved with the source capture. Offline arm and hand retargeting in robot-base coordinates. Prepare and check the rollout before physical execution.</p>
+    <button id="retarget-start" type="button" class="primary full">Retarget generated hand</button>
+    <p id="retarget-status" role="status" class="hint"></p>
+    <progress id="retarget-progress" hidden></progress>
+    <label for="retarget-result">Retargeting results</label><select id="retarget-result"></select>
+    <div id="retarget-view" hidden>
+      <button id="retarget-scene-open" type="button">Open URDF hand + table + board</button>
+      <p id="retarget-scene-status" class="hint" role="status"></p>
+      <iframe id="retarget-scene" title="URDF robot hand with calibrated table plane and board" hidden allow="fullscreen"></iframe>
+      <canvas id="retarget-canvas" width="1000" height="560" aria-label="Interactive robot-base hand skeleton viewer"></canvas>
+      <p class="hint">Solid: DG5F URDF joint skeleton · dashed: generated MANO · axes: robot base X red, Y green, Z blue. Drag to orbit; scroll to zoom. Coordinates are metres.</p>
+      <div class="button-row"><button id="retarget-play" type="button">Play</button><button id="retarget-reset" type="button">Reset view</button><label><input id="retarget-show-mano" type="checkbox" checked> Show generated MANO</label></div>
+      <input id="retarget-frame" type="range" min="0" max="0" value="0" step="1" aria-label="Trajectory frame">
+      <p id="retarget-frame-info" class="hint"></p>
+      <pre id="retarget-joints"></pre>
+      <div class="button-row"><a id="retarget-npz">Download joint trajectory NPZ</a><a id="retarget-demo" hidden>Download 60 Hz replay export (requires safety checks)</a><a id="retarget-json">Download 3D preview JSON</a><a id="retarget-manifest">Calibration and retargeting report</a></div>
+    </div>
+  </section>
+  <section class="panel" id="simulation-panel">
+    <div class="section-title"><span class="number">06</span><h2>MuJoCo scene + cube contact replay</h2></div>
+    <label for="simulation-source">Retargeted trajectory</label><select id="simulation-source"></select>
+    <p class="hint">Click the center of the cube’s top face in the first frame. Position is inferred using the calibrated table plane and the size below. Size, mass and friction are estimates, not recovered measurements.</p>
+    <canvas id="simulation-pick" width="832" height="640" hidden aria-label="Click the cube center in the first frame"></canvas>
+    <p id="simulation-selection" class="hint">Choose a completed retargeting result.</p>
+    <div class="row"><label>Cube edge [mm]<input id="simulation-edge" type="number" min="5" max="200" step="1" value="40"></label><label>Mass [g]<input id="simulation-mass" type="number" min="1" max="2000" step="1" value="50"></label><label>Yaw on table [°]<input id="simulation-yaw" type="number" min="-180" max="180" step="1" value="0"></label><label>Friction<input id="simulation-friction" type="number" min="0.05" max="3" step="0.05" value="0.8"></label></div>
+    <button id="simulation-start" type="button" class="primary full" disabled>Run MuJoCo contact replay</button>
+    <p class="hint">Simulates finger drives and a free cube with contacts. Palm motion is prescribed; UR5e arm dynamics and real-world grasp success are not validated.</p>
+    <p id="simulation-status" role="status"></p><progress id="simulation-progress" hidden></progress>
+    <label for="simulation-result">Simulation results</label><select id="simulation-result"></select>
+    <div id="simulation-output" hidden>
+      <p id="simulation-metrics" class="hint"></p>
+      <div class="previews"><figure><video id="simulation-camera-video" controls playsinline preload="metadata"></video><figcaption>Calibrated camera view</figcaption></figure><figure><video id="simulation-overview-video" controls playsinline preload="metadata"></video><figcaption>MuJoCo overview</figcaption></figure></div>
+      <div class="button-row"><a id="simulation-scene-download">Download MuJoCo model + meshes</a><a id="simulation-motion-download">Download simulated motion NPZ</a><a id="simulation-report-download">Contact and lift report</a></div>
+    </div>
+  </section>
+  <section class="panel workflow-step" id="rollout-panel" aria-labelledby="rollout-title">
+    <div class="section-title"><span class="number">07</span><h2 id="rollout-title">Run on the robot</h2></div>
+    <p class="step-description">Uses the selected retargeted finger angles and palm motion, with arm IK and slower timing for physical replay. MuJoCo simulation motion is never used. Preparation is offline; physical execution requires your confirmation.</p>
+    <label for="rollout-source">Retargeted output · Retargeted robot motion</label><select id="rollout-source"></select>
+    <p class="help">Preparation filters jitter and allocates time locally under arm and finger planning limits. New plans must fit an eight-second budget including final settling. Arm and hand move together continuously through the waypoints; the resulting path is checked again. New rollouts start at the current measured pose and translate the Cartesian hand path to it, then solve arm IK again. Run rechecks the shifted path before sending commands.</p>
+    <label for="rollout-speed">Replay speed</label>
+    <select id="rollout-speed"><option value="1" selected>1× source timing · slow locally as needed</option><option value="0.5">0.5× original timing</option><option value="0.25">0.25× original timing</option></select>
+    <p class="hint">Applied to both arm and fingers. Slower requests may exceed the eight-second budget and be refused. Prepare again after changing it.</p>
+    <button id="rollout-prepare" type="button" class="primary full">Prepare and check robot rollout</button>
+    <p id="rollout-status" role="status" class="hint"></p><progress id="rollout-progress" hidden></progress>
+    <label for="rollout-result">Prepared rollouts</label><select id="rollout-result"></select>
+    <label for="robot-execution-mode">Execution mode</label><select id="robot-execution-mode"><option value="arm-hand">Arm + hand</option><option value="arm-only">Arm only · no finger commands</option></select>
+    <div class="button-row hardware-actions"><button id="robot-run" type="button" class="primary" disabled>Run on robot</button><button id="robot-stop" type="button" class="danger" disabled>Stop robot</button></div>
+    <p id="robot-run-help" class="hint">Select a completed rollout above, or prepare one first.</p>
+    <p id="robot-state" class="notice" role="status">No physical replay active.</p><pre id="robot-log" class="rollout-command" hidden></pre>
+    <dialog id="robot-confirm-dialog" aria-labelledby="robot-confirm-title"><h2 id="robot-confirm-title">Run this motion on the physical robot?</h2>
+      <p id="robot-confirm-motion">The arm and fingers will move. Keep the workspace clear and the e-stop accessible. Stay on this page; loss of the browser heartbeat stops this replay.</p>
+      <label class="check"><input id="robot-workspace-clear" type="checkbox"> I inspected the motion, cleared the path, and stopped competing command clients.</label>
+      <label for="robot-confirm-text">Type SEND to confirm</label><input id="robot-confirm-text" autocomplete="off" placeholder="SEND">
+      <div class="button-row"><button id="robot-confirm-start" type="button" class="primary">Confirm and run</button><button id="robot-confirm-cancel" type="button">Cancel</button></div><p id="robot-confirm-error" class="error" hidden></p>
+    </dialog>
+    <div id="rollout-output" hidden>
+      <p id="rollout-metrics" class="notice"></p>
+      <p>First inspect the retargeted motion and clear the entire robot path. Keep the e-stop accessible. Stop capture, calibration, teleoperation, and any competing replay process.</p>
+      <p class="hint">Use the normal arm controller, rebuilt with joint-target watchdog reporting (<code>./arm/build.sh</code>, then <code>./arm/run_controller.sh</code>), plus the DG5F driver and bridge. The runner refuses unsupported controllers and excessive displacement from the source pose. It never homes automatically.</p>
+      <details><summary>Optional terminal commands</summary><h3>1. Check connections and start pose — no motion</h3><pre id="rollout-check-command" class="rollout-command"></pre>
+      <h3>2. Supervised physical replay</h3><pre id="rollout-send-command" class="rollout-command"></pre>
+      <p class="hint">Run this on the robot PC and type SEND only when ready. Ctrl-C stops the arm and holds measured finger positions. Commands are streamed with a controller timeout; freshness, tracking, and table clearance checks remain active.</p>
+      </details><p class="hint">This checks the calibrated table surface, not every obstacle, self-collision, or cable. Simulation success does not guarantee a physical grasp.</p>
+      <div class="downloads"><a id="rollout-download">Download rollout NPZ</a><a id="rollout-report">Validation report</a></div>
+    </div>
+  </section>
+  <section class="history"><div class="section-title"><h2 data-i18n="recent">Recent jobs</h2><button id="refresh-history" type="button" data-i18n="refresh">Refresh</button></div><div id="history-list" class="history-list"><p class="muted" data-i18n="noJobs">No jobs yet.</p></div></section>
+  <footer>H3 · HF15 mirrored / step 12983 <span data-i18n="robotFooter">UR5e + Tesollo DG5F · right hand</span></footer>
+</main>
+</body>
+</html>

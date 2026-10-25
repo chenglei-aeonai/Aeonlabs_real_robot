@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "method": "knuckle_width_scaled_wrist_distance_on_tool0_axis",
+  "wrist_to_knuckle_center_over_index_pinky_width": 1.2597245594121664,
+  "knuckle_indices": [
+    1,
+    4,
+    10,
+    7
+  ],
+  "axis": "robot tool0 +Z, transformed once into camera coordinates",
+  "root_branch": "wrist proximal to knuckle center",
+  "reference": {
+    "path": "/home/aeonlabs/AeonLabs/hand_retarget/data/20260928T132405_scene0_world_joints.csv",
+    "sha256": "17b2f19bce0c1019fe1dd904b68f4c4a179a3edeb2163703c2a6c372afda8a3a",
+    "valid_frames": 107,
+    "ratio_percentiles_5_95": [
+      1.246560233329186,
+      1.2790612687036367
+    ],
+    "description": "Recorded MANO-style right-hand landmarks from hand_retarget; not an official MANO template"
+  }
+}

@@ -1,0 +1,56 @@
+Edit the supplied cropped, undistorted robot photograph into a photorealistic
+human right hand and arm in the same scene.
+
+Replace the visible robotic fingers, palm, wrist adapter, mounting hardware, and
+visible robot arm with one continuous, anatomically plausible human right hand,
+wrist, forearm, and upper arm where visible. Preserve the existing scene,
+objects, table, background, illumination, viewpoint, image dimensions, crop,
+and object contact locations. Do not add a second hand, person, or extra limb.
+
+The capture-stage 21-point MANO skeleton is the authoritative reference for
+hand pose, wrist position, finger locations, and hand size. Match the human
+hand's projected joints and fingertips to those points in the image: do not
+merely place a generic human hand near the robot. Preserve handedness and
+the observed palm/dorsal orientation. Adapt human appearance and proportions
+to the fixed reference; do not move or rescale the reference skeleton.
+If projected landmarks fall outside the crop, keep them outside: allow the
+human hand or fingertips to be naturally cut off by the same image boundary.
+Never recenter, shrink, or shift the hand to fit all fingers inside the frame.
+
+Use the supplied crop-adjusted camera intrinsics and camera-space coordinates
+to maintain perspective and metric hand scale. Project with u,v = K*XYZ / Z.
+The image is already undistorted, so distortion is zero. The points are already
+in camera coordinates: do not apply camera extrinsics again.
+
+Use the captured arm skeleton and elbow-to-MANO-wrist reference to align the
+visible human arm and connect it smoothly to the fixed wrist. Robot joints
+are alignment guides, not additional anatomical human joints. Remove robotic
+materials and hardware within the allowed edit region instead of retaining
+a robotic wrist or a robot arm attached to a human hand.
+Use MANO joint 0 as the single shared wrist for the forearm and all five finger
+chains. The separate tool/TCP coordinates describe robot hardware only.
+
+The white mask marks editable pixels; black pixels are protected. Preserve
+objects and their occlusions even inside the editable region. Use skeleton
+overlays only as visual guides; output a clean photograph without skeleton
+lines, labels, masks, or additional text. If alignment cannot be satisfied,
+report the limitation rather than claiming that it has been verified.
+
+Orientation is fixed by the captured pose, not by a generic right-hand example.
+Keep the thumb on the THUMB BASE/TIP side and the little finger on the PINKY
+side of the labeled reference. Never mirror the scene or the hand alone,
+swap thumb and pinky, or turn a palm-facing hand into a back-facing hand (or
+vice versa). Preserve the 3D wrist rotation and finger depth ordering. Do not
+choose another photograph as the first frame. If the generated candidate is
+flipped, correct it against the original photograph and captured skeleton.
+
+For this setup the BACK (dorsal surface) of the RIGHT hand faces the camera;
+the palm faces away. Show dorsal knuckles and anatomically appropriate nail
+surfaces, not palm creases. This is an explicit operator orientation constraint.
+Use the provided projected joint positions to locate the hand and fingers;
+do not run a detector, fit a new skeleton, or change captured GT. Match all
+21 projected joints, including wrist and fingertips, preserving thumb/pinky
+identity. If geometry conflicts with this surface constraint, report the
+conflict instead of changing the skeleton or claiming a successful match.
+The geometric mask is only an edit envelope: preserve table, cube, and other
+object pixels and their occlusions even where they lie inside that envelope.

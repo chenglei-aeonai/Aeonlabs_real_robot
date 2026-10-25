@@ -1,0 +1,25 @@
+[project]
+name = "real_robot"
+version = "0.1.0"
+description = "Replay a robot demonstration on the real UR5e + DG5F through the ur5 PC's existing controllers"
+readme = "README.md"
+authors = [
+    { name = "Simone Cirelli", email = "simone.cirelli01@gmail.com" }
+]
+# The ur5 PC runs this with simtoolreal_real's .venv (Python 3.11, numpy, pyzmq); keep to that.
+requires-python = ">=3.11,<3.12"
+dependencies = [
+    "numpy",
+    "pyzmq",
+]
+
+[dependency-groups]
+dev = [
+    "pytest",
+]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
