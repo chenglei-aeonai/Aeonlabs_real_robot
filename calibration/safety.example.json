@@ -1,0 +1,62 @@
+{
+  "verified": false,
+  "robot_safety_setup_verified": false,
+  "verification_notes": "",
+  "workspace_min_m": [
+    null,
+    null,
+    null
+  ],
+  "workspace_max_m": [
+    null,
+    null,
+    null
+  ],
+  "table_min_xy_m": [
+    null,
+    null
+  ],
+  "table_max_xy_m": [
+    null,
+    null
+  ],
+  "table_top_z_m": null,
+  "table_plane": {
+    "frame": "robot_base",
+    "normal": [
+      null,
+      null,
+      null
+    ],
+    "offset_m": null
+  },
+  "tool_radius_m": null,
+  "arm_link_radii_m": [
+    null,
+    null,
+    null,
+    null,
+    null,
+    null
+  ],
+  "clearance_m": 0.05,
+  "uncertainty_m": 0.02,
+  "stopping_margin_m": 0.02,
+  "max_linear_speed_m_s": 0.01,
+  "max_angular_speed_deg_s": 2.0,
+  "max_linear_acceleration_m_s2": 0.02,
+  "max_angular_acceleration_deg_s2": 4.0,
+  "command_timeout_s": 0.15,
+  "state_timeout_s": 0.15,
+  "motion_timeout_s": 30.0,
+  "max_joint_deviation_deg": 10.0,
+  "max_joint_speed_deg_s": 5.0,
+  "max_start_translation_m": 0.08,
+  "max_downward_offset_m": 0.05,
+  "tilt_deg": 3.0,
+  "position_tolerance_m": 0.0015,
+  "angle_tolerance_deg": 0.2,
+  "settle_s": 0.5,
+  "samples_per_pose": 5,
+  "max_reprojection_error_px": 1.5
+}

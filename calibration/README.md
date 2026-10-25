@@ -134,3 +134,16 @@ old built-in 4x5 board.
 The reference run in `results/` was done with the **D455, serial 138322253845**. The D435I
 whose intrinsics are in `../intrinsic_calibration.txt` is serial **242322072500**; pass that
 serial to calibrate it. Intrinsics are read live from the device, not from a file.
+
+## Geometry used by generated-motion replay
+
+`surface_guard.py` loads `models/ur5e_dg5f_collision.json`, a checksum-verified
+collision support model for the UR5e and right DG5F. `build_collision_model.py`
+records the source URDF and mesh hashes and retains convex support vertices for
+signed plane-distance checks. `overlay_utils.py` supplies camera projection and
+nominal arm/hand transforms to `brain/capture/`.
+
+The model is robot geometry, not an installation calibration. Supply the actual
+capture's calibration results locally; table clearance does not certify other
+objects, cables or self-collision. New replay plans validate the entire shifted
+path and record their model and calibration provenance.

@@ -75,3 +75,15 @@ If it fails to bind port 5555, another controller instance (or a client that bin
   which is what `replay_real.py` uses. Lower `path_tracking_p_gain` for softer tracking.
 - `kpd_values`, `position_delta`, `orientation_delta`, `exponential_filter`: Cartesian servo parameters, not used by
   the replay.
+
+## Streamed retargeted replay
+
+Rebuild from the sources in this repository before using the pipeline runner.
+The controller starts idle, accepts explicit stop messages, reports actual joint
+velocities and protective/emergency stop flags, and advertises its joint-target
+watchdog. A missing target stream causes a stop. Protective stops require manual
+inspection and recovery; reconnect does not automatically unlock them.
+
+The sources also include the existing optional calibration guard and its
+standalone test target. Building requires `libssl-dev` for SHA-256 validation of
+collision geometry. No installation-specific safety configuration is included.

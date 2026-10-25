@@ -14,6 +14,7 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
 # Find dependencies
 find_package(ur_rtde REQUIRED)
+find_package(OpenSSL REQUIRED)
 
 # For ZeroMQ, use pkg-config as a fallback
 find_package(PkgConfig REQUIRED)
@@ -31,6 +32,12 @@ include_directories(${Python3_INCLUDE_DIRS})
 
 # Add executable
 add_executable(impedance_controller impedance_controller.cpp)
+add_executable(calibration_controller impedance_controller.cpp)
+target_compile_definitions(calibration_controller PRIVATE CALIBRATION_ONLY=1)
+add_executable(calibration_guard_test calibration_guard_test.cpp)
+target_include_directories(calibration_controller PRIVATE ${ZMQ_INCLUDE_DIRS})
+target_link_libraries(calibration_controller PRIVATE ur_rtde::rtde ${ZMQ_LIBRARIES} OpenSSL::Crypto)
+target_link_libraries(calibration_guard_test PRIVATE OpenSSL::Crypto)
 add_executable(state_publisher state_publisher.cpp)
 
 # Create a test executable
@@ -53,6 +60,7 @@ target_link_libraries(impedance_controller
     PRIVATE
         ur_rtde::rtde
         ${ZMQ_LIBRARIES}
+        OpenSSL::Crypto
 )
 
 target_link_libraries(state_publisher

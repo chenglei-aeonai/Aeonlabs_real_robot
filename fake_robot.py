@@ -37,6 +37,9 @@ class FakeArm(threading.Thread):
         self.q = np.array(start_q, dtype=float)
         self.frozen = frozen  # a stuck arm, to test the tracking check
         self.path = None  # (times, points, start)
+        self.target = None
+        self.target_at = 0.
+        self.watchdog_s = .2
         self.stopped_count = 0
         self.running = True
 
@@ -50,15 +53,29 @@ class FakeArm(threading.Thread):
                     break
                 if message.get("stop"):
                     self.path, self.stopped_count = None, self.stopped_count + 1
+                    self.target = None
                 elif "path" in message:
                     self.path = (np.array(message["time"]), np.array(message["path"]), time.monotonic())
+                    self.target = None
+                elif "target_q" in message:
+                    self.target = np.asarray(message['target_q'], float)
+                    self.target_at = time.monotonic()
+                    self.path = None
+            before = self.q.copy()
+            if self.target is not None and time.monotonic() - self.target_at > self.watchdog_s:
+                self.target = None
+            if self.target is not None and not self.frozen:
+                self.q += dt * self.p_gain * (self.target - self.q)
             if self.path is not None and not self.frozen:
                 times, points, start = self.path
                 t = time.monotonic() - start
                 ref = np.array([np.interp(t, times, points[:, j]) for j in range(6)])
                 ref_next = np.array([np.interp(t + dt, times, points[:, j]) for j in range(6)])
                 self.q = self.q + dt * ((ref_next - ref) / dt + self.p_gain * (ref - self.q))
-            self.state.send_json({"Q": self.q.tolist(), "Qd": [0.0] * 6})
+            self.state.send_json({"Q": self.q.tolist(), "Qd": ((self.q-before)/dt).tolist(),
+                                  "timestamp_ms": time.time()*1000,
+                                  "joint_target_watchdog_s": self.watchdog_s,
+                                  "protective_stopped": False, "emergency_stopped": False})
             time.sleep(dt)
 
     def close(self):
@@ -95,11 +112,13 @@ class FakeHand(threading.Thread):
                 message = json.loads(payload)
                 if message.get("type") == "hand_target":
                     self.target, self.received = np.array(message["positions"]), self.received + 1
+            before = self.q.copy()
             if self.target is not None:
                 step = self.max_speed * dt
                 self.q = self.q + np.clip(self.target - self.q, -step, step)
             sequence += 1
-            state = {"type": "hand_state", "sequence": sequence, "positions": self.q.tolist(), "velocities": [0.0] * 20}
+            state = {"type": "hand_state", "sequence": sequence, "positions": self.q.tolist(),
+                     "velocities": ((self.q-before)/dt).tolist(), "measured_age_s": 0.}
             self.out.sendto(json.dumps(state).encode(), self.state_endpoint)
             time.sleep(dt)
 

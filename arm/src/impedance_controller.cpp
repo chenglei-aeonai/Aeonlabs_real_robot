@@ -9,6 +9,7 @@
 #include <zmq.hpp>
 
 #include "pose.hpp"
+#include "calibration_guard.hpp"
 #include "spline.hpp"
 #include "ur_rtde/dashboard_client.h"
 #include "ur_rtde/rtde_control_interface.h"
@@ -58,6 +59,7 @@ class UR5Controller {
         : context(1),
           socket(context, ZMQ_SUB),
           publisher(context, ZMQ_PUB), 
+          calibration_guard(config.value("calibration_safety", json(nullptr))),
           control(robot_ip),
           receive(robot_ip),
           dashboard_client(robot_ip),
@@ -141,10 +143,19 @@ class UR5Controller {
     }
 
     void update_robot_state() {
+        if (calibration_guard.enabled) {
+            const double stamp = receive.getTimestamp();
+            if (!std::isfinite(stamp) || stamp < last_rtde_timestamp)
+                calibration_guard.trip("Robot RTDE timestamp invalid/reset; restart required");
+            if (stamp > last_rtde_timestamp) {
+                last_rtde_timestamp = stamp;
+                last_rtde_update = CalibrationGuard::Clock::now();
+            }
+        }
         current_pose = receive.getActualTCPPose();
         curr_vel = utils::std_to_eigen(receive.getActualTCPSpeed());
         curr_Q = utils::std_to_eigen(receive.getActualQ());
-        curr_Qd = utils::std_to_eigen(receive.getTargetQd());
+        curr_Qd = utils::std_to_eigen(receive.getActualQd());
         curr_force = utils::std_to_eigen(receive.getActualTCPForce());
         curr_force_lowpass = 0.9 * curr_force_lowpass + 0.1 * curr_force;
     }
@@ -156,6 +167,26 @@ class UR5Controller {
                 std::string received_message(static_cast<char *>(request.data()), request.size());
                 const auto received_json = json::parse(received_message);
 
+                if (received_json.value("stop", false)) {
+                    stop_requested = true;
+                    return 4;
+                }
+                if (calibration_guard.enabled) {
+                    calibration_guard.update_hand(received_json);
+                    if (received_json.contains("calibration_arm")) {
+                        calibration_guard.arm(received_json.at("calibration_arm").get<std::string>(),
+                            current_pose.to_std_vector(), utils::eigen_to_std(curr_Q));
+                        stop_requested = true;
+                        return 0;
+                    }
+                    CalibrationGuard::require(received_json.contains("target_ee_pose") && received_json.contains("calibration_session"),
+                        "Only session-bound calibration TCP commands allowed in guarded mode");
+                    const auto pose = received_json.at("target_ee_pose").get<std::vector<double>>();
+                    calibration_guard.target(received_json.at("calibration_session").get<std::string>(), pose, CalibrationGuard::Clock::now());
+                    target_pose = pose;
+                    current_mode = ControllerMode::EEPoseTarget;
+                    return 1;
+                }
                 if (received_json.contains("target_pose")) {
                     const std::vector<double> pose_vector =
                         received_json["target_pose"].get<std::vector<double>>();
@@ -194,8 +225,10 @@ class UR5Controller {
                     return 2;
                 } else if (received_json.contains("target_q")) {
                     target_Q = utils::std_to_eigen(received_json["target_q"]);
-                    std::cout << t().str() << "Received joint angles: ["
-                              << target_Q.transpose() << "]\n";
+                    if (verbose) {
+                        std::cout << t().str() << "Received streamed joint target (rad): ["
+                                  << target_Q.transpose() << "]\n";
+                    }
 
                     current_mode = ControllerMode::JointTarget;
                     last_joint_command_time = std::chrono::steady_clock::now();
@@ -263,6 +296,7 @@ class UR5Controller {
                     return -1;
                 }
             } catch (const std::exception &e) {
+                if (calibration_guard.enabled) { calibration_guard.trip(e.what()); stop_requested = true; }
                 std::cerr << t().str() << "Error parsing JSON: " << e.what() << "\n";
                 return -1;
             }
@@ -271,26 +305,9 @@ class UR5Controller {
     }
 
     bool reconnect() {
-        // auto resolve protective stops (5s delay is from UR)
-        if (receive.isProtectiveStopped()){
-            std::cout << "Robot is in protective stop, auto resolve in 5 seconds -> ";
-            for (int j = 5; j > 0; --j) {
-                std::cout << j << ", " << std::flush;
-                std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-            }
-            std::cout << " resolving\n";
-            std::this_thread::sleep_for(std::chrono::milliseconds(500));
-
-            dashboard_client.unlockProtectiveStop();
-            for (int i = 0; i < 10; ++i){
-                control.reuploadScript();   // for some reason this works
-                std::this_thread::sleep_for(std::chrono::milliseconds(500));
-                if (control.isProgramRunning()){
-                    std::cout << "--> Protective stop resolved!\n";
-                    return true;
-                }
-            }
-            std::cout << "Protective stop could not be resolved, please do it manually";
+        if (receive.isProtectiveStopped() || receive.isEmergencyStopped()) {
+            std::cerr << "Protective/emergency stop: inspect the cause and recover manually.\n";
+            return false;
         }
 
         for (int i = 0; i < 10; ++i) {
@@ -320,6 +337,10 @@ class UR5Controller {
             {"Qd", utils::eigen_to_std(curr_Qd)},
             {"force", utils::eigen_to_std(curr_force_lowpass)},
             {"is_truncated", !success},
+            {"protective_stopped", receive.isProtectiveStopped()},
+            {"emergency_stopped", receive.isEmergencyStopped()},
+            {"calibration_guard", calibration_guard.status()},
+            {"joint_target_watchdog_s", joint_command_timeout_s},
             {"timestamp_ms", std::chrono::duration_cast<std::chrono::milliseconds>(
                                  std::chrono::system_clock::now().time_since_epoch())
                                  .count()}};
@@ -334,6 +355,8 @@ class UR5Controller {
         target_Q.resize(0);
         joint_command_stream_active = false;
         stop_requested = false;
+        calibration_guard.moving = false;
+        guard_previous_velocity.setZero();
         current_mode = ControllerMode::Idle;
         prev_mode = ControllerMode::Idle;
         applied_speed.position.setZero();
@@ -350,10 +373,10 @@ class UR5Controller {
     }
 
     void run() {
-        current_pose = receive.getActualTCPPose();
+        update_robot_state();
         target_pose = current_pose.copy();
         control.zeroFtSensor();
-        control.setWatchdog(0.1);
+        control.setWatchdog(calibration_guard.enabled ? 10.0 : 0.1);
 
         PositionAccelerationLimiter limiter(position_acceleration, frequency);
 
@@ -362,6 +385,11 @@ class UR5Controller {
 
             get_reference();
 
+            if (calibration_guard.enabled && (!success || receive.isProtectiveStopped() || receive.isEmergencyStopped())) {
+                calibration_guard.trip("Robot stop/RTDE failure; manual inspection and controller restart required");
+                stop_motion(calibration_guard.fault);
+                return;
+            }
             if (!success) {
                 std::cout << "\nUR Controller not connected anymore, attempting to reconnect\n";
                 send_state();
@@ -392,6 +420,19 @@ class UR5Controller {
 
             control.kickWatchdog();
             send_state();
+            if (calibration_guard.enabled && calibration_guard.fault.empty()) {
+                try {
+                    CalibrationGuard::require(receive.isConnected() && std::chrono::duration<double>(CalibrationGuard::Clock::now()-last_rtde_update).count() <= calibration_guard.value("state_timeout_s"),
+                        "Robot RTDE feedback stalled/disconnected");
+                    calibration_guard.tick(current_pose.to_std_vector(), utils::eigen_to_std(curr_Q),
+                        utils::eigen_to_std(curr_vel), utils::eigen_to_std(curr_Qd), CalibrationGuard::Clock::now());
+                } catch (const std::exception &e) {
+                    calibration_guard.trip(e.what());
+                    stop_requested = true;
+                }
+            }
+            if (calibration_guard.enabled && !calibration_guard.fault.empty() && current_mode != ControllerMode::Idle)
+                stop_requested = true;
 
             if (stop_requested) {
                 success &= stop_motion("explicit stop command");
@@ -417,7 +458,7 @@ class UR5Controller {
                 reset_force_sensor = false;
             }
 
-            // move to specified reset pose
+            // Track a streamed joint target; this is not a reset/home command.
             if (current_mode == ControllerMode::JointTarget) {
                 if (target_Q.size() > 0) {
                     if (target_Q.size() != 6) {
@@ -451,8 +492,10 @@ class UR5Controller {
                         // update target pose
                         update_robot_state();
 
-                        std::cout << t().str()
-                                  << "Moved to reset joint angles: " << curr_Q.transpose() << "\n";
+                        if (verbose) {
+                            std::cout << t().str()
+                                      << "Measured joint feedback (rad): " << curr_Q.transpose() << "\n";
+                        }
                         applied_speed.position.setZero();
                         applied_speed.quat = Eigen::Quaterniond::Identity();
                         target_pose = current_pose.copy();
@@ -465,9 +508,17 @@ class UR5Controller {
             } else if (current_mode == ControllerMode::EEPoseTarget) {
                 applied_speed = calculate_speed(applied_speed);
                 limiter.apply_position(applied_speed);
-                success &= control.speedL(applied_speed.get_actual_speed_6D(deadspace_speed),
-                                          orientation_acceleration,
-                                          1. / frequency);  // since orientation_acc > position_acc
+                if (calibration_guard.enabled) {
+                    auto commanded = applied_speed.get_actual_speed_6D(deadspace_speed);
+                    Eigen::Matrix<double,6,1> limited;
+                    for(int i=0;i<6;++i) limited[i]=commanded[i];
+                    limited=calibration_guard.limit_speed(limited, guard_previous_velocity, frequency);
+                    guard_previous_velocity=limited;
+                    success &= control.speedL(utils::eigen_to_std(limited), calibration_guard.value("max_linear_acceleration_m_s2"), 1./frequency);
+                } else {
+                    success &= control.speedL(applied_speed.get_actual_speed_6D(deadspace_speed),
+                                              orientation_acceleration, 1. / frequency);
+                }
 
                 if (verbose && (applied_speed.position.array().abs() > deadspace_speed).any()) {
                     // Print applied speed, elapsed time, and pose error with orientation
@@ -515,7 +566,7 @@ class UR5Controller {
 
     void stop() {
         stop_flag.store(true);
-        control.setWatchdog(0.001);  // kill watchdog
+        if (!calibration_guard.enabled) control.setWatchdog(0.001);  // preserve guarded watchdog during stop
         auto success = control.speedStop();
         if (success) {
             std::cout << t().str() << "UR5Controller speedStop applied\n";
@@ -530,6 +581,10 @@ class UR5Controller {
     zmq::socket_t socket;
     zmq::socket_t publisher;
     
+    CalibrationGuard calibration_guard;
+    double last_rtde_timestamp = -1;
+    CalibrationGuard::Clock::time_point last_rtde_update = CalibrationGuard::Clock::now();
+    Eigen::Matrix<double,6,1> guard_previous_velocity = Eigen::Matrix<double,6,1>::Zero();
     ur_rtde::RTDEControlInterface control;
     ur_rtde::RTDEReceiveInterface receive;
     ur_rtde::DashboardClient dashboard_client;
@@ -555,7 +610,7 @@ class UR5Controller {
     double joint_command_timeout_s;
 
     // internal state
-    ControllerMode current_mode{ControllerMode::EEPoseTarget};
+    ControllerMode current_mode{ControllerMode::Idle};
     ControllerMode prev_mode{ControllerMode::EEPoseTarget};
 
     // indicates status of various ur5 commands
@@ -593,11 +648,24 @@ int main(int argc, char *argv[]) {
         std::ifstream config_file(config_path);
         if (!config_file.is_open()) throw std::runtime_error("Unable to open " + config_path);
         config_file >> config;
+        if (config.contains("calibration_safety_path")) {
+            std::ifstream safety_file(config.at("calibration_safety_path").get<std::string>());
+            if (!safety_file.is_open()) throw std::runtime_error("Cannot open calibration safety file");
+            safety_file >> config["calibration_safety"];
+            CalibrationGuard validate(config["calibration_safety"]); // validate before connecting to robot
+        }
         std::cout << "Loaded configuration from " << config_path << "\n";
     } catch (const std::exception &e) {
-        std::cerr << "Error loading config.json: " << e.what() << "\nUsing default values.\n";
+        std::cerr << "Error loading controller configuration: " << e.what() << "\n";
+        return 1;
     }
 
+#ifdef CALIBRATION_ONLY
+    if (!config.contains("calibration_safety") || !config.at("calibration_safety").is_object()) {
+        std::cerr << "The calibration-only controller requires verified calibration_safety settings.\n";
+        return 1;
+    }
+#endif
     std::cout << "Setting up controller" << std::endl;
     UR5Controller controller(config["robot_ip"].get<std::string>(), config);
 

@@ -9,6 +9,7 @@ Aeonlabs_real_robot/
 ├── hand/            DG5F ROS 2 driver sources, build script, ZMQ bridge   -> hand/README.md for install
 ├── arm/             UR5e low-level controller (binary + sources + config)  -> arm/README.md for install
 ├── calibration/     camera + robot base calibration with the EE marker board       -> calibration/README.md
+├── brain/           capture, generation, retargeting and supervised replay pipeline
 ├── replay_real.py   the replay (this file is the only thing that needs the venv below)
 ├── fake_robot.py    fake arm + hand with the same protocol, for trying without a robot
 ├── *.npz            recorded demonstrations (input)
@@ -79,3 +80,22 @@ Other options: `--hand-only`, `--controller-config arm/pc_ur_new.json` (if you c
 .venv/bin/python fake_robot.py          # fake arm controller + hand bridge, same protocol
 .venv/bin/python replay_real.py demo.npz --send
 ```
+
+## Generated-motion replay
+
+The integrated pipeline and actual robot controllers now live in this repository.
+See [brain/pipeline/docs/physical_replay.md](brain/pipeline/docs/physical_replay.md)
+for retargeting, local time allocation, fixed-pose resets, and the explicit
+Prepare / Run / Stop workflow. The original `replay_real.py` demo commands above
+remain available.
+
+Build the updated controller from source with `./arm/build.sh`, and run the
+updated hand bridge with `./hand/run_bridge.sh`. The new runner checks for the
+controller watchdog and measured-state freshness before allowing motion. It
+uses the saved capture calibration and the bundled collision support model;
+installation-specific calibration results must be supplied locally.
+
+The deployed test completed the original 4.4167-second arm-and-hand clip in
+6.3109 seconds, 7.7652 including final settling. See the
+[execution report](brain/pipeline/docs/eight_second_replay_20261025.md) for its
+remaining 3.309-degree finger error and actual limits.

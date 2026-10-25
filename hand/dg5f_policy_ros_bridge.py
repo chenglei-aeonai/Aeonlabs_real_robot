@@ -220,6 +220,7 @@ class Dg5fPolicyBridge(Node):
         payload = {
             "type": "hand_state",
             "sequence": self.state_sequence,
+            "measured_age_s": time.monotonic() - self.last_state_at,
             "positions": self.measured_q.tolist(),
             "velocities": self.measured_qd.tolist(),
         }

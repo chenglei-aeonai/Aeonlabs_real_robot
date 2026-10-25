@@ -5,3 +5,16 @@ hand/ws/build/
 hand/ws/install/
 hand/ws/log/
 arm/src/build/
+
+# Pipeline environments, local installations and generated outputs.
+*.egg-info/
+.pytest_cache/
+.env
+.env.*
+!.env.example
+arm/calibration_controller
+calibration/safety.json
+brain/capture/results/
+brain/pipeline/out/
+brain/pipeline/vendor/
+brain/RobotRetargeting/
