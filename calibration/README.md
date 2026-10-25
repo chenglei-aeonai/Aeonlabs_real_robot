@@ -141,7 +141,8 @@ serial to calibrate it. Intrinsics are read live from the device, not from a fil
 collision support model for the UR5e and right DG5F. `build_collision_model.py`
 records the source URDF and mesh hashes and retains convex support vertices for
 signed plane-distance checks. `overlay_utils.py` supplies camera projection and
-nominal arm/hand transforms to `brain/capture/`.
+nominal arm/hand transforms to the separately maintained
+[aeon-brain capture module](https://github.com/chenglei-aeonai/aeon-brain/tree/main/brain/capture).
 
 The model is robot geometry, not an installation calibration. Supply the actual
 capture's calibration results locally; table clearance does not certify other

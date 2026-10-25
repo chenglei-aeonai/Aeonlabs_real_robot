@@ -9,7 +9,6 @@ Aeonlabs_real_robot/
 ├── hand/            DG5F ROS 2 driver sources, build script, ZMQ bridge   -> hand/README.md for install
 ├── arm/             UR5e low-level controller (binary + sources + config)  -> arm/README.md for install
 ├── calibration/     camera + robot base calibration with the EE marker board       -> calibration/README.md
-├── brain/           capture, generation, retargeting and supervised replay pipeline
 ├── replay_real.py   the replay (this file is the only thing that needs the venv below)
 ├── fake_robot.py    fake arm + hand with the same protocol, for trying without a robot
 ├── *.npz            recorded demonstrations (input)
@@ -81,21 +80,21 @@ Other options: `--hand-only`, `--controller-config arm/pc_ur_new.json` (if you c
 .venv/bin/python replay_real.py demo.npz --send
 ```
 
-## Generated-motion replay
+## Pipeline integration
 
-The integrated pipeline and actual robot controllers now live in this repository.
-See [brain/pipeline/docs/physical_replay.md](brain/pipeline/docs/physical_replay.md)
-for retargeting, local time allocation, fixed-pose resets, and the explicit
-Prepare / Run / Stop workflow. The original `replay_real.py` demo commands above
-remain available.
+Capture, image editing, diffusion, retargeting, visualization and replay
+orchestration are maintained in
+[chenglei-aeonai/aeon-brain](https://github.com/chenglei-aeonai/aeon-brain).
+Follow its installation-layout instructions to use its `brain/` source with
+this hardware workspace. This repository supplies the controllers, hand
+bridge, calibration and collision geometry used by that pipeline.
 
-Build the updated controller from source with `./arm/build.sh`, and run the
-updated hand bridge with `./hand/run_bridge.sh`. The new runner checks for the
-controller watchdog and measured-state freshness before allowing motion. It
-uses the saved capture calibration and the bundled collision support model;
-installation-specific calibration results must be supplied locally.
+Build the updated controller with `./arm/build.sh` and start the hand bridge
+with `./hand/run_bridge.sh`. The pipeline checks the advertised watchdog,
+RTDE source freshness and measured hand-state age before motion. Keep
+installation-specific calibration results and safety configuration local.
 
-The deployed test completed the original 4.4167-second arm-and-hand clip in
-6.3109 seconds, 7.7652 including final settling. See the
-[execution report](brain/pipeline/docs/eight_second_replay_20261025.md) for its
-remaining 3.309-degree finger error and actual limits.
+See the pipeline's
+[physical replay guide](https://github.com/chenglei-aeonai/aeon-brain/blob/main/brain/pipeline/docs/physical_replay.md)
+for the Prepare / Run / Stop workflow. The original demo runner above remains
+available in this repository.

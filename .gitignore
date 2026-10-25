@@ -6,7 +6,7 @@ hand/ws/install/
 hand/ws/log/
 arm/src/build/
 
-# Pipeline environments, local installations and generated outputs.
+# Local environments, hardware setup and separately managed pipeline checkout.
 *.egg-info/
 .pytest_cache/
 .env
@@ -14,7 +14,6 @@ arm/src/build/
 !.env.example
 arm/calibration_controller
 calibration/safety.json
-brain/capture/results/
-brain/pipeline/out/
-brain/pipeline/vendor/
-brain/RobotRetargeting/
+
+# Source belongs to chenglei-aeonai/aeon-brain.
+brain/
